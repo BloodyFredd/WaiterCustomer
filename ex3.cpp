@@ -9,7 +9,11 @@
 #include<unistd.h>
 #include<sys/types.h>
 #include<sys/wait.h>
+#include <semaphore.h>
 using namespace std;
+
+int ReadCount=0,WriterCount=0;
+sem_t rmutex, wmutex , readTry, resource;
 
 struct Menu {
     int Id;
@@ -42,6 +46,44 @@ int checkArgs(int argc, char* argv[]){
     return 0;
 }
 
+void Waiter()
+{
+  sem_wait(&readTry);
+  sem_wait(&rmutex);
+  ReadCount++;
+  if(ReadCount == 1)
+	sem_wait(&resource);
+  sem_post(&rmutex);
+  sem_post(&readTry);
+
+  cout<<"Critical section\n";
+
+  sem_wait(&rmutex);
+  ReadCount--;
+  if(ReadCount == 0)
+	sem_post(&resource);	
+  sem_post(&rmutex);
+}
+
+void* Customer()
+{
+  sem_wait(&wmutex);
+  WriterCount++;
+  if(WriterCount == 1)
+	sem_wait(&readTry);
+  sem_post(&wmutex);
+
+  sem_wait(&resource);
+	cout<<"Critical section\n";
+  sem_post(&resource);
+  
+  sem_wait(&wmutex);
+  WriterCount--;
+  if( WriterCount == 0)
+	sem_post(&readTry);
+  sem_post(&wmutex);
+}
+
 int main(int argc, char* argv[])
 {
     clock_t t1;
@@ -49,6 +91,10 @@ int main(int argc, char* argv[])
         cout << "Input arguments are not valid!\n";
         exit(0);
     }
+    sem_init(&readTry, 0, 1);
+    sem_init(&rmutex, 0, 1);
+    sem_init(&wmutex, 0, 1);
+    sem_init(&resource, 0, 1);
     int numOfItems = atoi(argv[2]);
     t1 = clock();
     cout << setfill('=') << setw(25) << "Simulation arguments" << setfill('=') << setw(25) << "\n";
