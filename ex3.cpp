@@ -105,16 +105,16 @@ int main(int argc, char* argv[])
     clock_t t1;
     Ptime=static_cast<float*>(mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *Ptime=0;
-    readTry=sem_open("/readtry", O_CREAT, 0644, 0);
+    readTry=sem_open("readtry", O_CREAT|O_EXCL, 0644, 3);
     if(readTry == SEM_FAILED)
 	perror("readTry sem failed");
-    rmutex=sem_open("/rmutex", O_CREAT, 0644, 0);
+    rmutex=sem_open("rmutex", O_CREAT|O_EXCL, 0644, 3);
     if(rmutex == SEM_FAILED)
 	perror("rmutex sem failed");
-    wmutex=sem_open("/wmutex", O_CREAT, 0644, 0);
+    wmutex=sem_open("wmutex", O_CREAT|O_EXCL, 0644, 3);
     if(wmutex == SEM_FAILED)
 	perror("wmutex sem failed");
-    resource=sem_open("/resource", O_CREAT, 0644, 0);
+    resource=sem_open("resource", O_CREAT|O_EXCL, 0644, 3);
     if(resource == SEM_FAILED)
 	perror("resource sem failed");
     if(checkArgs(argc, argv) == 0)
@@ -145,15 +145,16 @@ int main(int argc, char* argv[])
     {
     if((pid=fork())==0)
     {
+	 readTry=sem_open("/readtry",0);
+       	 rmutex=sem_open("/rmutex",0);
+         wmutex=sem_open("/wmutex",0);
+         resource=sem_open("/resource",0);
         temp=getpid();
         //t = t+ (float)t1 / CLOCKS_PER_SEC;
        // cout<<"im t: "<< t <<"\n";
         while(*Ptime<7)
         {
-	 readTry=sem_open("/readtry",0);
-       	 rmutex=sem_open("/rmutex",0);
-         wmutex=sem_open("/wmutex",0);
-         resource=sem_open("/resource",0);
+
             cout<<"im t before: "<< *Ptime << " and pid: " <<temp<<"\n";
             Customer(temp);
 	    cout<<"im t after: "<< *Ptime << " and pid: " <<temp<<"\n";
