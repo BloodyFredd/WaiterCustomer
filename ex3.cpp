@@ -1,5 +1,7 @@
 #include<iostream>
 #include <iomanip>
+#include <random>
+#include <cmath>
 #include <time.h>
 #include<string>
 #include<vector>
@@ -12,17 +14,18 @@
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/ipc.h>
 #include <fcntl.h>
+#include <sys/sem.h>
+#include <sys/shm.h>
 using namespace std;
 
 //#define SNAME1 "/srmutex"
 //#define SNAME2 "/swmutex"
 //#define SNAME3 "/sreadtry"
 //#define SNAME4 "/sresource"
+#define SEMPERM 0600
 
-int ReadCount=0,WriterCount=0;
-sem_t *rmutex, *wmutex , *readTry, *resource;
-static float *Ptime;
 struct Menu {
     int Id;
     char Name[16];
@@ -36,6 +39,12 @@ struct orderBoard {
     int Amount;
     int Done;
 };
+
+static int *ReadCount=0,*WriterCount=0;
+int rmutex, wmutex , readTry, resource;
+static orderBoard *OB;
+static float *Ptime;
+
 
 void printMenu(Menu *menu, int length){
     cout << setfill('=') << setw(25) << "Menu list" << setfill('=') << setw(25) << "\n";
@@ -54,50 +63,130 @@ int checkArgs(int argc, char* argv[]){
     return 0;
 }
 
-void Waiter(sem_t *rmutex,sem_t *wmutex ,sem_t *readTry,sem_t *resource)
+int initsem(key_t semkey, int initval)
 {
-  sem_wait(readTry);
-  sem_wait(rmutex);
-  ReadCount++;
-  if(ReadCount == 1)
-	sem_wait(resource);
-  sem_post(rmutex);
-  sem_post(readTry);
+	int status = 0, semid;
+	union semun 
+	{
+		int val;
+		struct semid_ds *stat;
+		ushort *array;
+	} ctl_arg;
+
+	if ( ( semid = semget(semkey, 1, SEMPERM | IPC_CREAT | IPC_EXCL) ) == -1 )
+	{
+		if( errno ==  EEXIST )
+		{
+			if ( (semid = semget(semkey, 1, 0) ) == -1)
+			{
+				printf("Error creating semaphores\n");
+				exit(0);			
+			}
+		}
+		else
+		{
+			printf("Error creating semaphores\n");
+			exit(0);
+		}					
+	}		
+	ctl_arg.val = initval;
+	status = semctl(semid, 0, SETVAL, ctl_arg);
+	if(status == -1)
+	{
+		perror("initsem failed");
+		exit(0);
+	}	
+	return semid;	
+}
+
+void p(int semid)
+{
+	struct sembuf p_buf;
+	p_buf.sem_num = 0;
+	p_buf.sem_op = -1;
+	p_buf.sem_flg = SEM_UNDO;
+	if( semop( semid, &p_buf, 1) == -1 )
+	{
+		perror("p(semid) failed");
+		exit(0);
+	}
+}
+
+void v(int semid)
+{
+	struct sembuf v_buf;
+	v_buf.sem_num = 0;
+	v_buf.sem_op = 1;
+	v_buf.sem_flg = SEM_UNDO;
+
+	if( semop( semid, &v_buf, 1 ) == -1 )
+	{
+		perror("v(semid) failed");
+		exit(0);
+	}
+} 
+
+void Waiter()
+{
+  p(readTry);
+  p(rmutex);
+  (*ReadCount)++;
+  if((*ReadCount) == 1)
+	p(resource);
+  v(rmutex);
+  v(readTry);
 
   sleep(3);
   cout<<"Critical section\n";
  
 
-  sem_wait(rmutex);
-  ReadCount--;
-  if(ReadCount == 0)
-	sem_post(resource);	
-  sem_post(rmutex);
+  p(rmutex);
+  (*ReadCount)--;
+  if((*ReadCount) == 0)
+	v(resource);	
+  v(rmutex);
 }
 
-void* Customer(int temp)
+int randNum(int smallV, int highV){
+    /*static thread_local std::mt19937 generator;
+    std::uniform_int_distribution<int> distribution(smallV, highV);
+    return distribution(generator);*/
+    std::random_device r;
+    std::default_random_engine e1(r());
+    std::uniform_int_distribution<int> uniform_dist(smallV, highV);
+    return uniform_dist(e1);
+}
+
+void* Customer(int temp, int id, Menu *menu, int numOfDishes)
 {
-  int wmutexval;
-  cout<<"im the pid in here:"<<temp<<"\n";
-  sem_getvalue(wmutex,&wmutexval);
-  cout<<"im the wmutexval: "<<wmutexval<<"\n";
-  sem_wait(wmutex);
-  WriterCount++;
-  if(WriterCount == 1)
-	sem_wait(readTry);
-  sem_post(wmutex);
+  int SleepTime=randNum(3, 6);
+  sleep(randNum(3, 6));
+  int orderAmount = randNum(1,4), order = randNum(0,2), menuOrder = randNum(1, numOfDishes);
+  //cout<<"im the pid in here:"<<temp<<"\n";
+  p(wmutex);
+  (*WriterCount)++;
+  if((*WriterCount) == 1){
+	p(readTry);
+    }
+  sleep(1);
+  if(order == 0)
+    cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
+  else
+    cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
   
-  sem_wait(resource);
-	cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
-	  sleep(3);
-  sem_post(resource);
-cout<<"im out with pid: "<<temp<<"\n";
+  v(wmutex);
+  p(resource);
+	//cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
+	 // sleep(3);
+	
+  v(resource);
+  //cout<<"im out with pid: "<<temp<<"\n";
   
-  sem_wait(wmutex);
-  WriterCount--;
-  if( WriterCount == 0)
-	sem_post(readTry);
-  sem_post(wmutex);
+  p(wmutex);
+  (*WriterCount)--;
+  if( (*WriterCount) == 0)
+	v(readTry);
+  v(wmutex);
 }
 
 int main(int argc, char* argv[])
@@ -105,28 +194,30 @@ int main(int argc, char* argv[])
     clock_t t1;
     Ptime=static_cast<float*>(mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *Ptime=0;
-    readTry=sem_open("readtry", O_CREAT|O_EXCL, 0644, 3);
-    if(readTry == SEM_FAILED)
-	perror("readTry sem failed");
-    rmutex=sem_open("rmutex", O_CREAT|O_EXCL, 0644, 3);
-    if(rmutex == SEM_FAILED)
-	perror("rmutex sem failed");
-    wmutex=sem_open("wmutex", O_CREAT|O_EXCL, 0644, 3);
-    if(wmutex == SEM_FAILED)
-	perror("wmutex sem failed");
-    resource=sem_open("resource", O_CREAT|O_EXCL, 0644, 3);
-    if(resource == SEM_FAILED)
-	perror("resource sem failed");
+
+    WriterCount=static_cast<int*>(mmap(NULL,sizeof *WriterCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
+    *WriterCount=0;
+
+    ReadCount=static_cast<int*>(mmap(NULL,sizeof *ReadCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
+    *ReadCount=0;
+
+    key_t semkey1   = ftok(".", 1);
+    key_t semkey2   = ftok(".", 2);
+    key_t semkey3   = ftok(".", 3);
+    key_t semkey4   = ftok(".", 4);
+    rmutex = initsem(semkey1, 1);   
+    wmutex = initsem(semkey2, 1);   
+    readTry = initsem(semkey3, 1);   
+    resource = initsem(semkey4, 1);   
+
     if(checkArgs(argc, argv) == 0)
     {
         cout << "Input arguments are not valid!\n";
         exit(0);
     }
-    //sem_init(&readTry, 0, 1);
-    //sem_init(&rmutex, 0, 1);
-    //sem_init(&wmutex, 0, 1);
-    //sem_init(&resource, 0, 1);
+
     int numOfItems = atoi(argv[2]);
+    int mem_id=shmget(IPC_PRIVATE, 10*sizeof(orderBoard), SHM_R | SHM_W);
     t1 = clock();
     cout << setfill('=') << setw(25) << "Simulation arguments" << setfill('=') << setw(25) << "\n";
     cout << "Simulation time: " << argv[1];
@@ -139,25 +230,24 @@ int main(int argc, char* argv[])
     Menu menu[] = {{ 0 , "Pizza" , 10.5 , 0 }, { 1 , "Salad", 7.50, 0}, { 2, "Hamburger", 12.00, 0}, { 3, "Spaghetti", 9.00, 0}, {4, "Pie", 9.50, 0}, {5, "Milkshake", 6.00, 0} , {6, "Vodka", 12.25, 0}};
     printMenu(menu, numOfItems);
     
+    OB=(orderBoard*)shmat(mem_id,NULL,0);
+    
+    //cout<<"loldsfdsfdsfs\n";
     pid_t pid, wpid;
     int status=0,temp=0;
     for(int i=0;i<2;i++)
     {
     if((pid=fork())==0)
     {
-	 readTry=sem_open("/readtry",0);
-       	 rmutex=sem_open("/rmutex",0);
-         wmutex=sem_open("/wmutex",0);
-         resource=sem_open("/resource",0);
         temp=getpid();
         //t = t+ (float)t1 / CLOCKS_PER_SEC;
        // cout<<"im t: "<< t <<"\n";
-        while(*Ptime<7)
+        while(*Ptime<30)
         {
 
-            cout<<"im t before: "<< *Ptime << " and pid: " <<temp<<"\n";
-            Customer(temp);
-	    cout<<"im t after: "<< *Ptime << " and pid: " <<temp<<"\n";
+            //cout<<"im t before: "<< *Ptime << " and pid: " <<temp<<"\n";
+            Customer(temp, i, menu, numOfItems);
+	    //cout<<"im t after: "<< *Ptime << " and pid: " <<temp<<"\n";
 
         } 
  
@@ -167,11 +257,7 @@ int main(int argc, char* argv[])
        perror("fork error");
     }
     }
-         sem_close(readTry);
-	 sem_close(rmutex);
-	 sem_close(wmutex);
-	 sem_close(resource); 
-       while(*Ptime<7)
+       while(*Ptime<30)
             {
             t1 = clock();
             *Ptime=(float)t1 / CLOCKS_PER_SEC;
