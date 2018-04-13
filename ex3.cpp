@@ -40,11 +40,22 @@ struct orderBoard {
     int Done;
 };
 
+struct orderList
+{
+    orderBoard data;
+    orderList *next;
+};
+
 static int *ReadCount=0,*WriterCount=0;
 int rmutex, wmutex , readTry, resource;
-static orderBoard *OB;
+static orderList *OB;
 static float *Ptime;
 
+void printBoardList(orderList *head){
+    orderList *tmp = head;
+    while(tmp->next != NULL)
+        cout << tmp->data.CustomerId << ", " << tmp->data.ItemId << ", " << tmp->data.Amount << ", " << tmp->data.Done << "\n";
+}
 
 void printMenu(Menu *menu, int length){
     cout << setfill('=') << setw(25) << "Menu list" << setfill('=') << setw(25) << "\n";
@@ -173,7 +184,11 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
     cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
   else
     cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
-  
+  OB->data.CustomerId = id;
+  OB->data.ItemId = menuOrder;
+  OB->data.Amount = orderAmount;
+  OB->data.Done = 0;
+  OB->next = NULL;
   v(wmutex);
   p(resource);
 	//cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
@@ -229,9 +244,9 @@ int main(int argc, char* argv[])
     cout << " Main process ID " << getpid() << " start\n";
     Menu menu[] = {{ 0 , "Pizza" , 10.5 , 0 }, { 1 , "Salad", 7.50, 0}, { 2, "Hamburger", 12.00, 0}, { 3, "Spaghetti", 9.00, 0}, {4, "Pie", 9.50, 0}, {5, "Milkshake", 6.00, 0} , {6, "Vodka", 12.25, 0}};
     printMenu(menu, numOfItems);
-    
-    OB=(orderBoard*)shmat(mem_id,NULL,0);
-    
+    OB = NULL;
+    OB=(orderList*)shmat(mem_id,NULL,0);
+    orderList *head = OB;
     //cout<<"loldsfdsfdsfs\n";
     pid_t pid, wpid;
     int status=0,temp=0;
@@ -267,6 +282,6 @@ int main(int argc, char* argv[])
             //waitpid(pid,&status, 0);
             //kill(pid,SIGTERM);
 		    //perror("wait error");
-
+    //printBoardList(head);
    return 1;
 }
