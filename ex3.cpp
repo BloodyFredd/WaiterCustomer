@@ -137,6 +137,42 @@ void v(int semid)
 	}
 } 
 
+
+
+orderList* BuildAlist(orderList *func, orderList *item)
+{
+ func = new orderList;
+ func->next=NULL;
+ orderList *tmp=func;
+ orderList *Iptr=item;
+ while(Iptr!=NULL)
+ {
+     orderList *newSnode = new orderList;
+     newSnode->next=NULL;
+     newSnode->data.CustomerId = item->data.CustomerId;
+     newSnode->data.ItemId = item->data.ItemId;
+     newSnode->data.Amount = item->data.Amount;
+     newSnode->data.Done = item->data.Done;
+     tmp->next=newSnode;
+     tmp=tmp->next;
+     Iptr=Iptr->next;
+     tmp->next = NULL;
+ }
+     orderList *newSnode = new orderList;
+     newSnode->next=NULL;
+     newSnode->data.CustomerId = item->data.CustomerId;
+     newSnode->data.ItemId = item->data.ItemId;
+     newSnode->data.Amount = item->data.Amount;
+     newSnode->data.Done = item->data.Done;
+     tmp->next=newSnode;
+     tmp=tmp->next;
+     tmp->next = NULL;
+
+  return func->next;
+}
+
+
+
 void Waiter()
 {
   p(readTry);
@@ -204,9 +240,10 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
  	 	nextnode->data.ItemId = menuOrder;
  	 	nextnode->data.Amount = orderAmount;
  	 	nextnode->data.Done = 0;
-		nextnode->next=NULL;
- 	 	OB->next = nextnode;
-		OB=OB->next;
+		OB=BuildAlist(OB,nextnode);
+		//nextnode->next=NULL;
+ 	 	//OB->next = nextnode;
+		//OB=OB->next;
 	}
 	if((*firstflag)==1)
 		(*firstflag)=0;
@@ -251,7 +288,7 @@ int main(int argc, char* argv[])
     }
 
     int numOfItems = atoi(argv[2]);
-    int mem_id=shmget(IPC_PRIVATE, 10*sizeof(orderBoard), SHM_R | SHM_W);
+    int mem_id=shmget(IPC_PRIVATE, 10*sizeof(orderList), SHM_R | SHM_W);
     t1 = clock();
     cout << setfill('=') << setw(25) << "Simulation arguments" << setfill('=') << setw(25) << "\n";
     cout << "Simulation time: " << argv[1];
@@ -266,7 +303,8 @@ int main(int argc, char* argv[])
     OB = NULL;
     OB=(orderList*)shmat(mem_id,NULL,0);
     orderList *head = OB;
-    pid_t pid, wpid;
+    pid_t pid, wpid,fpid;
+    fpid=getpid();
     int status=0,temp=0;
     for(int i=0;i<2;i++)
     {
@@ -304,6 +342,8 @@ int main(int argc, char* argv[])
      
      int j=1;
      sleep(2);
+     if(getpid()==fpid)
+     {
      while(head!=NULL)
 	{
 	   cout<<j<<")\n";
@@ -314,5 +354,6 @@ int main(int argc, char* argv[])
 	    head=head->next;
 	   j++;
 	}
+     }
    return 1;
 }
