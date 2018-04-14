@@ -48,7 +48,7 @@ struct orderList
 
 static int *ReadCount=0,*WriterCount=0,*firstflag;
 int rmutex, wmutex , readTry, resource;
-struct orderList *OB = NULL;
+struct orderBoard *OB = NULL;
 static float *Ptime;
 
 void printBoardList(orderList *head){
@@ -227,16 +227,15 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
 	//cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
 	 // sleep(3);
   if(order == 1){
-	if((*firstflag)==1)
-  	{
-          cout << "????\n";
-		OB->data.CustomerId = id;
-  		OB->data.ItemId = menuOrder;
-  		OB->data.Amount = orderAmount;
-  		OB->data.Done = 0;
-  		OB->next = NULL;
+	//if((*firstflag)==1)
+  	//{
+		OB[id].CustomerId = id;
+  		OB[id].ItemId = menuOrder;
+  		OB[id].Amount = orderAmount;
+  		OB[id].Done = 0;
+  		//OB->next = NULL;
         (*firstflag)=0;
-	}
+	/*}
 	else
 	{
             cout << "!!!!\n";
@@ -254,7 +253,7 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
  	 	//OB->next = nextnode;
 		//OB=OB->next;
 	}
-    }
+    */}
 		
   v(resource);
   //cout<<"im out with pid: "<<temp<<"\n";
@@ -309,9 +308,11 @@ int main(int argc, char* argv[])
     cout << " Main process ID " << getpid() << " start\n";
     Menu menu[] = {{ 0 , "Pizza" , 10.5 , 0 }, { 1 , "Salad", 7.50, 0}, { 2, "Hamburger", 12.00, 0}, { 3, "Spaghetti", 9.00, 0}, {4, "Pie", 9.50, 0}, {5, "Milkshake", 6.00, 0} , {6, "Vodka", 12.25, 0}};
     printMenu(menu, numOfItems);
-    //OB = NULL;
-    OB=(orderList*)shmat(mem_id,NULL,0);
-    orderList *head = OB;
+    OB = new orderBoard[atoi(argv[3])];
+    OB=(orderBoard*)shmat(mem_id,NULL,0);
+    //OB=(orderList*)shmat(mem_id,NULL,0);
+    //orderList *head = OB;
+
     pid_t pid, wpid,fpid;
     fpid=getpid();
     int status=0,temp=0;
@@ -320,11 +321,12 @@ int main(int argc, char* argv[])
     if((pid=fork())==0)
     {
         temp=getpid();
+        cout << *Ptime << " Customer ID " << i << ": created PID " << getpid() << " PPID " << getppid() << "\n";
+
         //t = t+ (float)t1 / CLOCKS_PER_SEC;
        // cout<<"im t: "<< t <<"\n";
         while(*Ptime<15)
         {
-
             //cout<<"im t before: "<< *Ptime << " and pid: " <<temp<<"\n";
             Customer(temp, i, menu, numOfItems);
 	    //cout<<"im t after: "<< *Ptime << " and pid: " <<temp<<"\n";
@@ -347,13 +349,16 @@ int main(int argc, char* argv[])
             //waitpid(pid,&status, 0);
             //kill(pid,SIGTERM);
 		    //perror("wait error");
-    printBoardList(head);
+    //printBoardList(head);
      
      int j=1;
      sleep(2);
      if(getpid()==fpid)
      {
-     while(head!=NULL)
+         for(int i = 0; i < atoi(argv[3]); i++)
+            cout << OB[i].CustomerId << ", " << OB[i].ItemId << ", " << OB[i].Amount << ", " << OB[i].Done << "\n";
+
+     /*while(head!=NULL)
 	{
 	   cout<<j<<")\n";
 	   cout<<"Customer id: "<<head->data.CustomerId<<"\n";
@@ -362,7 +367,7 @@ int main(int argc, char* argv[])
   	   cout<<"CustomerOrderDone: "<<head->data.Done<<"\n\n";
 	    head=head->next;
 	   j++;
-	}
+	}*/
      }
    return 1;
 }
