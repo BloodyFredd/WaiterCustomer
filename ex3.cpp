@@ -46,7 +46,7 @@ struct orderList
     orderList *next;
 };
 
-static int *ReadCount=0,*WriterCount=0;
+static int *ReadCount=0,*WriterCount=0,*firstflag;
 int rmutex, wmutex , readTry, resource;
 static orderList *OB;
 static float *Ptime;
@@ -184,16 +184,32 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
     cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
   else
     cout << *Ptime << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
-  OB->data.CustomerId = id;
-  OB->data.ItemId = menuOrder;
-  OB->data.Amount = orderAmount;
-  OB->data.Done = 0;
-  OB->next = NULL;
+
   v(wmutex);
   p(resource);
 	//cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
 	 // sleep(3);
-	
+	if((*firstflag)==1)
+  	{
+		OB->data.CustomerId = id;
+  		OB->data.ItemId = menuOrder;
+  		OB->data.Amount = orderAmount;
+  		OB->data.Done = 0;
+  		OB->next = NULL;
+	}
+	else
+	{
+		orderList *nextnode=new orderList;
+ 	 	nextnode->data.CustomerId = id;
+ 	 	nextnode->data.ItemId = menuOrder;
+ 	 	nextnode->data.Amount = orderAmount;
+ 	 	nextnode->data.Done = 0;
+		nextnode->next=NULL;
+ 	 	OB->next = nextnode;
+		OB=OB->next;
+	}
+	if((*firstflag)==1)
+		(*firstflag)=0;
   v(resource);
   //cout<<"im out with pid: "<<temp<<"\n";
   
@@ -215,6 +231,9 @@ int main(int argc, char* argv[])
 
     ReadCount=static_cast<int*>(mmap(NULL,sizeof *ReadCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *ReadCount=0;
+
+    firstflag=static_cast<int*>(mmap(NULL,sizeof *ReadCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
+    *firstflag=1;
 
     key_t semkey1   = ftok(".", 1);
     key_t semkey2   = ftok(".", 2);
@@ -247,7 +266,6 @@ int main(int argc, char* argv[])
     OB = NULL;
     OB=(orderList*)shmat(mem_id,NULL,0);
     orderList *head = OB;
-    //cout<<"loldsfdsfdsfs\n";
     pid_t pid, wpid;
     int status=0,temp=0;
     for(int i=0;i<2;i++)
@@ -257,7 +275,7 @@ int main(int argc, char* argv[])
         temp=getpid();
         //t = t+ (float)t1 / CLOCKS_PER_SEC;
        // cout<<"im t: "<< t <<"\n";
-        while(*Ptime<30)
+        while(*Ptime<15)
         {
 
             //cout<<"im t before: "<< *Ptime << " and pid: " <<temp<<"\n";
@@ -272,7 +290,7 @@ int main(int argc, char* argv[])
        perror("fork error");
     }
     }
-       while(*Ptime<30)
+     while(*Ptime<15)
             {
             t1 = clock();
             *Ptime=(float)t1 / CLOCKS_PER_SEC;
@@ -283,5 +301,18 @@ int main(int argc, char* argv[])
             //kill(pid,SIGTERM);
 		    //perror("wait error");
     //printBoardList(head);
+     
+     int j=1;
+     sleep(2);
+     while(head!=NULL)
+	{
+	   cout<<j<<")\n";
+	   cout<<"Customer id: "<<head->data.CustomerId<<"\n";
+  	   cout<<"CustomerMenuOrder: "<<head->data.ItemId<<"\n";
+  	   cout<<"CustomerOrderAmount: "<<head->data.Amount<<"\n";
+  	   cout<<"CustomerOrderDone: "<<head->data.Done<<"\n\n";
+	    head=head->next;
+	   j++;
+	}
    return 1;
 }
