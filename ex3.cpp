@@ -48,13 +48,15 @@ struct orderList
 
 static int *ReadCount=0,*WriterCount=0,*firstflag;
 int rmutex, wmutex , readTry, resource;
-static orderList *OB;
+struct orderList *OB = NULL;
 static float *Ptime;
 
 void printBoardList(orderList *head){
     orderList *tmp = head;
-    while(tmp->next != NULL)
+    while(tmp != NULL){
         cout << tmp->data.CustomerId << ", " << tmp->data.ItemId << ", " << tmp->data.Amount << ", " << tmp->data.Done << "\n";
+        tmp = tmp->next;
+    }
 }
 
 void printMenu(Menu *menu, int length){
@@ -141,30 +143,32 @@ void v(int semid)
 
 orderList* BuildAlist(orderList *func, orderList *item)
 {
- func = new orderList;
- func->next=NULL;
+ //func = new orderList;
+ //func->next=NULL;
  orderList *tmp=func;
  orderList *Iptr=item;
- while(Iptr!=NULL)
+ while(tmp!=NULL)
  {
-     orderList *newSnode = new orderList;
+     /*orderList *newSnode = new orderList;
      newSnode->next=NULL;
-     newSnode->data.CustomerId = item->data.CustomerId;
-     newSnode->data.ItemId = item->data.ItemId;
-     newSnode->data.Amount = item->data.Amount;
-     newSnode->data.Done = item->data.Done;
+     newSnode->data.CustomerId = Iptr->data.CustomerId;
+     newSnode->data.ItemId = Iptr->data.ItemId;
+     newSnode->data.Amount = Iptr->data.Amount;
+     newSnode->data.Done = Iptr->data.Done;
      tmp->next=newSnode;
      tmp=tmp->next;
      Iptr=Iptr->next;
      tmp->next = NULL;
+     */
+    tmp=tmp->next;
  }
-     orderList *newSnode = new orderList;
+     orderList *newSnode;// = new orderList;
      newSnode->next=NULL;
      newSnode->data.CustomerId = item->data.CustomerId;
      newSnode->data.ItemId = item->data.ItemId;
      newSnode->data.Amount = item->data.Amount;
      newSnode->data.Done = item->data.Done;
-     tmp->next=newSnode;
+     tmp = newSnode;
      tmp=tmp->next;
      tmp->next = NULL;
 
@@ -195,9 +199,6 @@ void Waiter()
 }
 
 int randNum(int smallV, int highV){
-    /*static thread_local std::mt19937 generator;
-    std::uniform_int_distribution<int> distribution(smallV, highV);
-    return distribution(generator);*/
     std::random_device r;
     std::default_random_engine e1(r());
     std::uniform_int_distribution<int> uniform_dist(smallV, highV);
@@ -208,7 +209,7 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
 {
   int SleepTime=randNum(3, 6);
   sleep(randNum(3, 6));
-  int orderAmount = randNum(1,4), order = randNum(0,2), menuOrder = randNum(1, numOfDishes);
+  int orderAmount = randNum(1,4), order = randNum(0,2), menuOrder = randNum(0, numOfDishes - 1);
   //cout<<"im the pid in here:"<<temp<<"\n";
   p(wmutex);
   (*WriterCount)++;
@@ -225,28 +226,36 @@ void* Customer(int temp, int id, Menu *menu, int numOfDishes)
   p(resource);
 	//cout<<"Critical section with pid: "<<temp<<" and time " << *Ptime << "\n";
 	 // sleep(3);
+  if(order == 1){
 	if((*firstflag)==1)
   	{
+          cout << "????\n";
 		OB->data.CustomerId = id;
   		OB->data.ItemId = menuOrder;
   		OB->data.Amount = orderAmount;
   		OB->data.Done = 0;
   		OB->next = NULL;
+        (*firstflag)=0;
 	}
 	else
 	{
-		orderList *nextnode=new orderList;
+            cout << "!!!!\n";
+		orderList *nextnode;//=new orderList;
  	 	nextnode->data.CustomerId = id;
  	 	nextnode->data.ItemId = menuOrder;
  	 	nextnode->data.Amount = orderAmount;
  	 	nextnode->data.Done = 0;
-		OB=BuildAlist(OB,nextnode);
+        nextnode->next = NULL;
+        OB->next = nextnode;
+        OB = OB->next;
+        OB->next = NULL;
+		//OB=BuildAlist(OB,nextnode);
 		//nextnode->next=NULL;
  	 	//OB->next = nextnode;
 		//OB=OB->next;
 	}
-	if((*firstflag)==1)
-		(*firstflag)=0;
+    }
+		
   v(resource);
   //cout<<"im out with pid: "<<temp<<"\n";
   
@@ -300,7 +309,7 @@ int main(int argc, char* argv[])
     cout << " Main process ID " << getpid() << " start\n";
     Menu menu[] = {{ 0 , "Pizza" , 10.5 , 0 }, { 1 , "Salad", 7.50, 0}, { 2, "Hamburger", 12.00, 0}, { 3, "Spaghetti", 9.00, 0}, {4, "Pie", 9.50, 0}, {5, "Milkshake", 6.00, 0} , {6, "Vodka", 12.25, 0}};
     printMenu(menu, numOfItems);
-    OB = NULL;
+    //OB = NULL;
     OB=(orderList*)shmat(mem_id,NULL,0);
     orderList *head = OB;
     pid_t pid, wpid,fpid;
@@ -338,7 +347,7 @@ int main(int argc, char* argv[])
             //waitpid(pid,&status, 0);
             //kill(pid,SIGTERM);
 		    //perror("wait error");
-    //printBoardList(head);
+    printBoardList(head);
      
      int j=1;
      sleep(2);
