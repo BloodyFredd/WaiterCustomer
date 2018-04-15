@@ -179,8 +179,9 @@ orderList* BuildAlist(orderList *func, orderList *item)
 
 void Waiter(int id,int NOC, Menu *menu)
 {
-  sleep(randNum(1, 2));
+  
   p(readTry);
+  sleep(randNum(1, 2));
   p(rmutex);
   (*ReadCount)++;
   if((*ReadCount) == 1)
@@ -229,13 +230,15 @@ void* Customer(int id, int numOfDishes)
     cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
   }
   else
-  {
+    {
         printf("%.3f", (float)*Ptime);
 	    cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
 		OB[id].CustomerId = id;
   		OB[id].ItemId = menuOrder;
   		OB[id].Amount = orderAmount;
-  		OB[id].Done = 0;}	
+  		OB[id].Done = 0;
+		cout<<"CustID: "<< OB[id].CustomerId<<"  Item id: "<< OB[id].ItemId <<"  Amount: "<<  OB[id].Amount <<"\n";
+    }	
   }
   v(resource);
   
@@ -247,7 +250,7 @@ void* Customer(int id, int numOfDishes)
 }
 
 void initMenu(){
-	menu = new Menu[10];
+	//menu = new Menu[10];
 	menu[0].Id = 0;
 	strcpy(menu[0].Name, "Pizza");
 	menu[0].Price = 10.50;
@@ -306,7 +309,7 @@ int main(int argc, char* argv[])
     *WaitersNumber=atoi(argv[4]);
 
     WaitersCount=static_cast<int*>(mmap(NULL,sizeof *WaitersCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
-    *WaitersCount=0;
+    *WaitersCount=-1;
     
     int totalnum=(*CustomerNumber)+(*WaitersNumber);
     key_t semkey1   = ftok(".", 1);
@@ -333,7 +336,6 @@ int main(int argc, char* argv[])
     int numOfItems = atoi(argv[2]),NumOfCustProc=atoi(argv[3]);
     int mem_id=shmget(IPC_PRIVATE, 10*sizeof(orderBoard), SHM_R | SHM_W);
     int menu_id=shmget(IPC_PRIVATE, 10*sizeof(Menu), SHM_R | SHM_W);
-    menu=(Menu*)shmat(menu_id,NULL,0);
     t1 = clock();
     cout << setfill('=') << setw(25) << "Simulation arguments" << setfill('=') << setw(25) << "\n";
     cout << "Simulation time: " << argv[1];
@@ -343,10 +345,13 @@ int main(int argc, char* argv[])
     cout << setfill('=') << setw(50) << "\n";
     *Ptime=(float)t1 / CLOCKS_PER_SEC;
     printf("%.3f", (float)*Ptime);
+	
     cout << " Main process ID " << getpid() << " start\n";
+        
+    menu=(Menu*)shmat(menu_id,0,0);
     initMenu();
     printMenu(numOfItems);
-    OB = new orderBoard[atoi(argv[3])];
+    //OB = new orderBoard[atoi(argv[3])];
     OB=(orderBoard*)shmat(mem_id,NULL,0);
     int k = 0;
     while(k < atoi(argv[3])){
@@ -393,9 +398,10 @@ int main(int argc, char* argv[])
 		
 		p(WN);
             printf("%.3f", (float)*Ptime);
-			cout << " Waiter ID " << *WaitersCount << ": created PID " << getpid() << " PPID " << getppid() << "\n";
+			
 			(*WaitersNumber)--;
 			(*WaitersCount)++;
+			cout << " Waiter ID " << *WaitersCount << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 		v(WN);
 		while(*Ptime<15)
         	{
