@@ -237,7 +237,6 @@ void* Customer(int id, int numOfDishes)
   		OB[id].ItemId = menuOrder;
   		OB[id].Amount = orderAmount;
   		OB[id].Done = 0;
-		cout<<"CustID: "<< OB[id].CustomerId<<"  Item id: "<< OB[id].ItemId <<"  Amount: "<<  OB[id].Amount <<"\n";
     }	
   }
   v(resource);
