@@ -20,10 +20,6 @@
 #include <sys/shm.h>
 using namespace std;
 
-//#define SNAME1 "/srmutex"
-//#define SNAME2 "/swmutex"
-//#define SNAME3 "/sreadtry"
-//#define SNAME4 "/sresource"
 #define SEMPERM 0600
 
 struct Menu {
@@ -40,13 +36,7 @@ struct orderBoard {
     int Done = -1;
 };
 
-struct orderList
-{
-    orderBoard data;
-    orderList *next;
-};
-
-static int *ReadCount=0,*WriterCount=0,*firstflag,*CustomerNumber,*WaitersNumber,*WaitersCount;
+static int *ReadCount=0,*WriterCount=0,*CustomerNumber,*WaitersNumber,*WaitersCount;
 int rmutex, wmutex , readTry, resource,ReadBlock,CN,WN;
 struct orderBoard *OB = NULL;
 struct Menu *menu;
@@ -60,16 +50,16 @@ void printMenu(int length){
     cout << setfill('=') << setw(50) << "\n";
 }
 
-int randNum(int smallV, int highV){
+float randNum(float smallV, float highV){
     std::random_device r;
     std::default_random_engine e1(r());
-    std::uniform_int_distribution<int> uniform_dist(smallV, highV);
+    std::uniform_real_distribution<float> uniform_dist(smallV, highV);
     return uniform_dist(e1);
 }
 
 int checkArgs(int argc, char* argv[]){
     if(argc == 5){
-        if(atoi(argv[2]) > 7 || atoi(argv[3]) > 10 || atoi(argv[4]) > 3)
+        if(atoi(argv[2]) > 10 || atoi(argv[3]) > 10 || atoi(argv[4]) > 3)
             return 0;
         return 1;
     }
@@ -140,48 +130,11 @@ void v(int semid)
 } 
 
 
-
-orderList* BuildAlist(orderList *func, orderList *item)
-{
- //func = new orderList;
- //func->next=NULL;
- orderList *tmp=func;
- orderList *Iptr=item;
- while(tmp!=NULL)
- {
-     /*orderList *newSnode = new orderList;
-     newSnode->next=NULL;
-     newSnode->data.CustomerId = Iptr->data.CustomerId;
-     newSnode->data.ItemId = Iptr->data.ItemId;
-     newSnode->data.Amount = Iptr->data.Amount;
-     newSnode->data.Done = Iptr->data.Done;
-     tmp->next=newSnode;
-     tmp=tmp->next;
-     Iptr=Iptr->next;
-     tmp->next = NULL;
-     */
-    tmp=tmp->next;
- }
-     orderList *newSnode;// = new orderList;
-     newSnode->next=NULL;
-     newSnode->data.CustomerId = item->data.CustomerId;
-     newSnode->data.ItemId = item->data.ItemId;
-     newSnode->data.Amount = item->data.Amount;
-     newSnode->data.Done = item->data.Done;
-     tmp = newSnode;
-     tmp=tmp->next;
-     tmp->next = NULL;
-
-  return func->next;
-}
-
-
-
-void Waiter(int id,int NOC, Menu *menu)
+void Waiter(int id,int NOC)
 {
   
   p(readTry);
-  sleep(randNum(1, 2));
+  usleep(1000000 * randNum(1, 2));
   p(rmutex);
   (*ReadCount)++;
   if((*ReadCount) == 1)
@@ -210,9 +163,9 @@ void Waiter(int id,int NOC, Menu *menu)
   v(rmutex);
 }
 
-void* Customer(int id, int numOfDishes)
+void Customer(int id, int numOfDishes)
 {
-  sleep(randNum(3, 6));
+  usleep(1000000 * randNum(3, 6));
   int orderAmount = randNum(1,4), order = randNum(0,2), menuOrder = randNum(0, numOfDishes - 1);
   p(wmutex);
   (*WriterCount)++;
@@ -222,7 +175,7 @@ void* Customer(int id, int numOfDishes)
 
   v(wmutex);
   p(resource);
-    sleep(1);
+  usleep(1000000);
  if(OB[id].Done != 0)
  {
   if(order == 0){
@@ -249,46 +202,62 @@ void* Customer(int id, int numOfDishes)
 }
 
 void initMenu(){
-	//menu = new Menu[10];
-	menu[0].Id = 0;
+	menu[0].Id = 1;
 	strcpy(menu[0].Name, "Pizza");
 	menu[0].Price = 10.50;
 	menu[0].TotalOrdered = 0;
 	
-	menu[1].Id = 1;
+	menu[1].Id = 2;
 	strcpy(menu[1].Name, "Salad");
 	menu[1].Price = 7.50;
 	menu[1].TotalOrdered = 0;	
 	
-	menu[2].Id = 2;
+	menu[2].Id = 3;
 	strcpy(menu[2].Name, "Hamburger");
 	menu[2].Price = 12.00;
 	menu[2].TotalOrdered = 0;	
 	
-	menu[3].Id = 3;
+	menu[3].Id = 4;
 	strcpy(menu[3].Name, "Spaghetti");
 	menu[3].Price = 9.00;
 	menu[3].TotalOrdered = 0;
 	
-	menu[4].Id = 4;
+	menu[4].Id = 5;
 	strcpy(menu[4].Name, "Pie");
 	menu[4].Price = 9.50;
 	menu[4].TotalOrdered = 0;	
 	    
-	menu[5].Id = 5;
+	menu[5].Id = 6;
 	strcpy(menu[5].Name, "Milkshake");
 	menu[5].Price = 6.00;
 	menu[5].TotalOrdered = 0;	
 	        
-	menu[6].Id = 6;
+	menu[6].Id = 7;
 	strcpy(menu[6].Name, "Vodka");
 	menu[6].Price = 12.25;
 	menu[6].TotalOrdered = 0;	
-}	    
+
+    menu[7].Id = 8;
+	strcpy(menu[7].Name, "Schnitzel");
+	menu[7].Price = 14.50;
+	menu[7].TotalOrdered = 0;
+
+    menu[8].Id = 9;
+	strcpy(menu[8].Name, "Croissant");
+	menu[8].Price = 3.5;
+	menu[8].TotalOrdered = 0;
+
+    menu[9].Id = 10;
+	strcpy(menu[9].Name, "Coffee");
+	menu[9].Price = 2.50;
+	menu[9].TotalOrdered = 0;
+}	  
 
 int main(int argc, char* argv[])
 {
     clock_t t1;
+    int totalOrders = 0;
+    float amount = 0.0;
     Ptime=static_cast<float*>(mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *Ptime=0;
 
@@ -297,9 +266,6 @@ int main(int argc, char* argv[])
 
     ReadCount=static_cast<int*>(mmap(NULL,sizeof *ReadCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *ReadCount=0;
-
-    firstflag=static_cast<int*>(mmap(NULL,sizeof *ReadCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
-    *firstflag=1;
 
     CustomerNumber=static_cast<int*>(mmap(NULL,sizeof *CustomerNumber, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
     *CustomerNumber=atoi(argv[3]);
@@ -335,33 +301,29 @@ int main(int argc, char* argv[])
     int numOfItems = atoi(argv[2]),NumOfCustProc=atoi(argv[3]);
     int mem_id=shmget(IPC_PRIVATE, 10*sizeof(orderBoard), SHM_R | SHM_W);
     int menu_id=shmget(IPC_PRIVATE, 10*sizeof(Menu), SHM_R | SHM_W);
-    t1 = clock();
     cout << setfill('=') << setw(25) << "Simulation arguments" << setfill('=') << setw(25) << "\n";
     cout << "Simulation time: " << argv[1];
     cout << "\nMenu items count: " << argv[2];
     cout << "\nCustomers count: " << argv[3];
     cout << "\nWaiters count: " << argv[4] << "\n";
     cout << setfill('=') << setw(50) << "\n";
+    t1 = clock();
     *Ptime=(float)t1 / CLOCKS_PER_SEC;
     printf("%.3f", (float)*Ptime);
-	
-    cout << " Main process ID " << getpid() << " start\n";
-        
+    cout << " Main process ID " << getpid() << " start\n";      
     menu=(Menu*)shmat(menu_id,0,0);
     initMenu();
     printMenu(numOfItems);
-    //OB = new orderBoard[atoi(argv[3])];
     OB=(orderBoard*)shmat(mem_id,NULL,0);
+    pid_t pid;
+    //int timepid;
+    printf("%.3f", (float)*Ptime);
+    cout << " Main process start creating sub-process\n";
     int k = 0;
     while(k < atoi(argv[3])){
 	    OB[k].Done = -1;
 	    k++;
     }
-    pid_t pid, wpid,fpid;
-    fpid=getpid();
-    int status=0,temp=0,timepid;
-    printf("%.3f", (float)*Ptime);
-    cout << " Main process start creating sub-process\n";
     for(int i=0;i<(totalnum+1);i++)
     {
     if((pid=fork())==0)
@@ -369,7 +331,7 @@ int main(int argc, char* argv[])
 
 	if(i==totalnum)
          {
-	   timepid=getpid();
+	   //timepid=getpid();
 	   while(true)
             {
             t1 = clock();
@@ -378,8 +340,7 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-        temp=getpid();
-	if(i<NumOfCustProc)//(*CustomerNumber)!=0)        
+	if(i<NumOfCustProc)      
 	{
 		
 		p(CN);
@@ -387,10 +348,12 @@ int main(int argc, char* argv[])
 			cout << " Customer ID " << i << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 			(*CustomerNumber)--;
 		v(CN);
-		while(*Ptime<15)
+		while(*Ptime<atoi(argv[1]))
         	{
             		Customer(i,numOfItems);
         	} 
+        printf("%.3f", (float)*Ptime);
+        cout << " Customer ID " << i << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
 	}
 	else if(i>=NumOfCustProc && i<totalnum)     
 	{
@@ -402,10 +365,13 @@ int main(int argc, char* argv[])
 			(*WaitersCount)++;
 			cout << " Waiter ID " << *WaitersCount << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 		v(WN);
-		while(*Ptime<15)
+		while(*Ptime<atoi(argv[1]))
         	{
-            		Waiter(*WaitersCount,NumOfCustProc, menu);
+            		Waiter(*WaitersCount,NumOfCustProc);
         	} 
+        printf("%.3f", (float)*Ptime);
+        cout << " Waiter ID " << *WaitersNumber << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
+
 	}
  		exit(0);
 	}
@@ -419,7 +385,25 @@ int main(int argc, char* argv[])
 	   for(int i=0;i<totalnum;i++) // loop will run n times (n=5)
     	   	wait(NULL);
 	   //kill(timepid,SIGKILL);
-
    printMenu(numOfItems);
+   for(int j = 0; j < numOfItems; j++){
+       totalOrders += menu[j].TotalOrdered;
+       amount += menu[j].TotalOrdered * menu[j].Price;
+   }
+   shmctl(mem_id, IPC_RMID, 0);
+   shmctl(menu_id, IPC_RMID, 0);
+   semctl(semkey1, 0, IPC_RMID);
+   semctl(semkey2, 0, IPC_RMID);
+   semctl(semkey3, 0, IPC_RMID);
+   semctl(semkey4, 0, IPC_RMID);
+   semctl(semkey5, 0, IPC_RMID);
+   semctl(semkey6, 0, IPC_RMID);
+   semctl(semkey7, 0, IPC_RMID);
+
+   cout << "Total orders " << totalOrders << ", for an amount " << amount << " NIL\n";
+   printf("%.3f", (float)*Ptime);
+   cout << " Main ID " << getpid() << " end work\n";
+   printf("%.3f", (float)*Ptime);
+   cout << " End of simulation\n";
    return 1;
 }
