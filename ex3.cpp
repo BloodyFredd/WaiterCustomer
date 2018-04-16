@@ -258,7 +258,7 @@ int main(int argc, char* argv[])
     clock_t t1;
     int totalOrders = 0;
     float amount = 0.0;
-    Ptime=static_cast<float*>(mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
+    Ptime=(float *)mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0);
     *Ptime=0;
 
     WriterCount=static_cast<int*>(mmap(NULL,sizeof *WriterCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
@@ -390,8 +390,19 @@ int main(int argc, char* argv[])
        totalOrders += menu[j].TotalOrdered;
        amount += menu[j].TotalOrdered * menu[j].Price;
    }
+   cout << "Total orders " << totalOrders << ", for an amount " << amount << " NIL\n";
+   printf("%.3f", (float)*Ptime);
+   cout << " Main ID " << getpid() << " end work\n";
+   printf("%.3f", (float)*Ptime);
+   cout << " End of simulation\n";
+
    shmctl(mem_id, IPC_RMID, 0);
    shmctl(menu_id, IPC_RMID, 0);
+   munmap(WriterCount, 5000);
+   munmap(ReadCount, 5000);
+   munmap(CustomerNumber, 5000);
+   munmap(WaitersNumber, 5000);
+   munmap(WaitersCount, 5000);
    semctl(semkey1, 0, IPC_RMID);
    semctl(semkey2, 0, IPC_RMID);
    semctl(semkey3, 0, IPC_RMID);
@@ -399,11 +410,7 @@ int main(int argc, char* argv[])
    semctl(semkey5, 0, IPC_RMID);
    semctl(semkey6, 0, IPC_RMID);
    semctl(semkey7, 0, IPC_RMID);
-
-   cout << "Total orders " << totalOrders << ", for an amount " << amount << " NIL\n";
-   printf("%.3f", (float)*Ptime);
-   cout << " Main ID " << getpid() << " end work\n";
-   printf("%.3f", (float)*Ptime);
-   cout << " End of simulation\n";
-   return 1;
+   munmap(Ptime, 100);
+   cout << "free like a bird\n";
+   return 0;
 }
