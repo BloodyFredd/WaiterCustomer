@@ -37,7 +37,7 @@ struct orderBoard {
 };
 
 static int *ReadCount=0,*WriterCount=0,*CustomerNumber,*WaitersNumber,*WaitersCount;
-int rmutex, wmutex , readTry, resource,ReadBlock,CN,WN;
+int rmutex, wmutex , readTry, resource,ReadBlock,CN,WN,TimeBlock;
 struct orderBoard *OB = NULL;
 struct Menu *menu;
 static float *Ptime;
@@ -59,10 +59,28 @@ float randNum(float smallV, float highV){
 
 int checkArgs(int argc, char* argv[]){
     if(argc == 5){
-        if(atoi(argv[2]) > 10 || atoi(argv[3]) > 10 || atoi(argv[4]) > 3)
-            return 0;
+	int Time=atoi(argv[1]), MenuItem=atoi(argv[2]) ,Cust=atoi(argv[3]), Waiter=atoi(argv[4]);
+        if(Time >= 20 || Time < 0)
+	{	 cerr << "Time is invalid!\n";
+			return 0;
+	}
+	if(Cust > 10 || Cust < 0)
+	{	 cerr << "Invalid customer number!\n";
+			return 0;
+	}
+	if(Waiter > 3 || Waiter < 0)	
+	{
+	 cerr << "invalid waiter number!\n";
+         return 0;
+	}
+	if(MenuItem <0 || MenuItem > 10)
+	{
+	 cerr << "Menu items number is not valid!\n";
+            	 return 0;
+	}
         return 1;
     }
+    cerr<<"invalid num of arguments\n";
     return 0;
 }
 
@@ -147,7 +165,9 @@ void Waiter(int id,int NOC)
 	 {
 	   if(OB[i].Done == 0)
 		{
-           printf("%.3f", (float)*Ptime);
+		 p(TimeBlock);
+          	    printf("%.3f", (float)*Ptime);
+		 v(TimeBlock);
 		   cout << " Waiter ID " << id << ": performs order of Customer ID: " << i << " (" << menu[OB[i].ItemId].Name << ", " << OB[i].Amount << ")\n";
 		   OB[i].Done=1;
 	   	   menu[OB[i].ItemId].TotalOrdered = menu[OB[i].ItemId].TotalOrdered + OB[i].Amount;
@@ -179,12 +199,16 @@ void Customer(int id, int numOfDishes)
  if(OB[id].Done != 0)
  {
   if(order == 0){
+    p(TimeBlock);
     printf("%.3f", (float)*Ptime);
+     v(TimeBlock);
     cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
   }
   else
     {
-        printf("%.3f", (float)*Ptime);
+	p(TimeBlock);
+        	printf("%.3f", (float)*Ptime);
+	v(TimeBlock);
 	    cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
 		OB[id].CustomerId = id;
   		OB[id].ItemId = menuOrder;
@@ -284,6 +308,7 @@ int main(int argc, char* argv[])
     key_t semkey5   = ftok(".", 5);
     key_t semkey6   = ftok(".", 6);
     key_t semkey7   = ftok(".", 7);
+    key_t semkey8   = ftok(".", 8);
     rmutex = initsem(semkey1, 1);   
     wmutex = initsem(semkey2, 1);   
     readTry = initsem(semkey3, 1);   
@@ -291,10 +316,10 @@ int main(int argc, char* argv[])
     ReadBlock= initsem(semkey5, 1);  
     CN = initsem(semkey6, 1); 
     WN = initsem(semkey7, 1); 
+    TimeBlock=initsem(semkey8, 1);
 
     if(checkArgs(argc, argv) == 0)
     {
-        cout << "Input arguments are not valid!\n";
         exit(0);
     }
 
@@ -308,17 +333,21 @@ int main(int argc, char* argv[])
     cout << "\nWaiters count: " << argv[4] << "\n";
     cout << setfill('=') << setw(50) << "\n";
     t1 = clock();
+    p(TimeBlock);
     *Ptime=(float)t1 / CLOCKS_PER_SEC;
     printf("%.3f", (float)*Ptime);
-    cout << " Main process ID " << getpid() << " start\n";      
+    cout << " Main process ID " << getpid() << " start\n"; 
+    v(TimeBlock);   
     menu=(Menu*)shmat(menu_id,0,0);
     initMenu();
     printMenu(numOfItems);
     OB=(orderBoard*)shmat(mem_id,NULL,0);
     pid_t pid;
-    //int timepid;
+    int timepid;
+    p(TimeBlock);
     printf("%.3f", (float)*Ptime);
     cout << " Main process start creating sub-process\n";
+    v(TimeBlock);
     int k = 0;
     while(k < atoi(argv[3])){
 	    OB[k].Done = -1;
@@ -331,11 +360,13 @@ int main(int argc, char* argv[])
 
 	if(i==totalnum)
          {
-	   //timepid=getpid();
+	   timepid=getpid();
 	   while(true)
             {
             t1 = clock();
+	     p(TimeBlock);
             *Ptime=(float)t1 / CLOCKS_PER_SEC;
+             v(TimeBlock);
 	    }
 	}
 	else
@@ -344,34 +375,61 @@ int main(int argc, char* argv[])
 	{
 		
 		p(CN);
-            printf("%.3f", (float)*Ptime);
+		 p(TimeBlock);
+            		printf("%.3f", (float)*Ptime);
+		 v(TimeBlock);
 			cout << " Customer ID " << i << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 			(*CustomerNumber)--;
 		v(CN);
-		while(*Ptime<atoi(argv[1]))
+		while(true)
         	{
+			 p(TimeBlock);
+			if(*Ptime>atoi(argv[1]))
+			{
+			   v(TimeBlock);
+				break;
+			}
+			 v(TimeBlock);
             		Customer(i,numOfItems);
         	} 
+	p(WN);
+	 p(TimeBlock);
         printf("%.3f", (float)*Ptime);
+	  v(TimeBlock);
         cout << " Customer ID " << i << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
+	v(WN);
 	}
 	else if(i>=NumOfCustProc && i<totalnum)     
 	{
 		
-		p(WN);
-            printf("%.3f", (float)*Ptime);
-			
+		p(CN);
 			(*WaitersNumber)--;
 			(*WaitersCount)++;
+			int Wid=(*WaitersCount);
+			p(TimeBlock);
+            			printf("%.3f", (float)*Ptime);
+		 	v(TimeBlock);	
 			cout << " Waiter ID " << *WaitersCount << ": created PID " << getpid() << " PPID " << getppid() << "\n";
-		v(WN);
-		while(*Ptime<atoi(argv[1]))
+		v(CN);
+		while(true)
         	{
-            		Waiter(*WaitersCount,NumOfCustProc);
+			p(TimeBlock);
+			if(*Ptime>atoi(argv[1]))
+			{
+			  v(TimeBlock);
+				break;
+			   
+			}
+			 v(TimeBlock);
+            		Waiter(Wid,NumOfCustProc);
         	} 
+	p(WN);
+	   p(TimeBlock);
         printf("%.3f", (float)*Ptime);
-        cout << " Waiter ID " << *WaitersNumber << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
-
+	   v(TimeBlock);
+        cout << " Waiter ID " << Wid << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
+	v(WN);
+	
 	}
  		exit(0);
 	}
@@ -384,7 +442,7 @@ int main(int argc, char* argv[])
 
 	   for(int i=0;i<totalnum;i++) // loop will run n times (n=5)
     	   	wait(NULL);
-	   //kill(timepid,SIGKILL);
+	   kill(timepid,SIGKILL);
    printMenu(numOfItems);
    for(int j = 0; j < numOfItems; j++){
        totalOrders += menu[j].TotalOrdered;
@@ -410,6 +468,7 @@ int main(int argc, char* argv[])
    semctl(semkey5, 0, IPC_RMID);
    semctl(semkey6, 0, IPC_RMID);
    semctl(semkey7, 0, IPC_RMID);
+   semctl(semkey8, 0, IPC_RMID);
    munmap(Ptime, 100);
    cout << "free like a bird\n";
    return 0;
