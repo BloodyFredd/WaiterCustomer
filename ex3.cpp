@@ -40,7 +40,7 @@ static int *ReadCount=0,*WriterCount=0,*CustomerNumber,*WaitersNumber,*WaitersCo
 int rmutex, wmutex , readTry, resource,ReadBlock,CN,WN,TimeBlock;
 struct orderBoard *OB = NULL;
 struct Menu *menu;
-static float *Ptime;
+static double *Ptime;
 
 void printMenu(int length){
     cout << setfill('=') << setw(25) << "Menu list" << setfill('=') << setw(25) << "\n";
@@ -50,11 +50,11 @@ void printMenu(int length){
     cout << setfill('=') << setw(50) << "\n";
 }
 
-float randNum(float smallV, float highV){
+double randNum(double smallV, double highV){
     std::random_device r;
     std::default_random_engine e1(r());
-    std::uniform_real_distribution<float> uniform_dist(smallV, highV);
-    return uniform_dist(e1);
+    std::uniform_real_distribution<double> uniform_dist(smallV, highV);
+    return (double)uniform_dist(e1);
 }
 
 int checkArgs(int argc, char* argv[]){
@@ -152,7 +152,12 @@ void Waiter(int id,int NOC)
 {
   
   p(readTry);
-  usleep(1000000 * randNum(1, 2));
+  struct timespec t;
+  double num = randNum(1.0, 2.0);
+  t.tv_sec = (time_t)num;
+  t.tv_nsec = (long) ((num - t.tv_sec ) * 1e+9);
+  //sleep(randNum(1.0, 2.0));
+  nanosleep(&t, (struct timespec *)NULL);
   p(rmutex);
   (*ReadCount)++;
   if((*ReadCount) == 1)
@@ -166,7 +171,7 @@ void Waiter(int id,int NOC)
 	   if(OB[i].Done == 0)
 		{
 		 p(TimeBlock);
-          	    printf("%.3f", (float)*Ptime);
+          	    printf("%.3lf", (float)*Ptime);
 		 v(TimeBlock);
 		   cout << " Waiter ID " << id << ": performs order of Customer ID: " << i << " (" << menu[OB[i].ItemId].Name << ", " << OB[i].Amount << ")\n";
 		   OB[i].Done=1;
@@ -185,7 +190,15 @@ void Waiter(int id,int NOC)
 
 void Customer(int id, int numOfDishes)
 {
-  usleep(1000000 * randNum(3, 6));
+  //sleep(randNum(3, 6));
+  struct timespec t;
+  double num = randNum(3.0, 6.0);
+  //cout << num << "\n";
+  t.tv_sec = (int)num;
+  //cout << num - t.tv_sec << "\n";
+  t.tv_nsec = ((num - t.tv_sec) * 1e+9);
+  //cout << t.tv_nsec << "\n";
+  nanosleep(&t, (struct timespec *)NULL);
   int orderAmount = randNum(1,4), order = randNum(0,2), menuOrder = randNum(0, numOfDishes - 1);
   p(wmutex);
   (*WriterCount)++;
@@ -195,19 +208,21 @@ void Customer(int id, int numOfDishes)
 
   v(wmutex);
   p(resource);
-  usleep(1000000);
+  t.tv_sec = 1;
+  t.tv_nsec = 0;
+  nanosleep(&t, NULL);
  if(OB[id].Done != 0)
  {
   if(order == 0){
     p(TimeBlock);
-    printf("%.3f", (float)*Ptime);
+    printf("%.3lf", (float)*Ptime);
      v(TimeBlock);
     cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (doesn't want to order)\n";
   }
   else
     {
 	p(TimeBlock);
-        	printf("%.3f", (float)*Ptime);
+        	printf("%.3lf", (float)*Ptime);
 	v(TimeBlock);
 	    cout << " Customer ID " << id << ": reads about " << menu[menuOrder].Name << " (ordered, amount " << orderAmount << ")\n";
 		OB[id].CustomerId = id;
@@ -223,6 +238,14 @@ void Customer(int id, int numOfDishes)
   if( (*WriterCount) == 0)
 	v(readTry);
   v(wmutex);
+}
+
+int checkDone(){
+    for(int i = 0; i < 3; i++){
+        if(OB[i].Done == 0)
+            return 0;
+    }
+    return 1;
 }
 
 void initMenu(){
@@ -280,9 +303,11 @@ void initMenu(){
 int main(int argc, char* argv[])
 {
     clock_t t1;
+    struct timespec begin, end;
+    clock_gettime(CLOCK_MONOTONIC, &begin);
     int totalOrders = 0;
     float amount = 0.0;
-    Ptime=(float *)mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0);
+    Ptime=(double *)mmap(NULL,sizeof *Ptime, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0);
     *Ptime=0;
 
     WriterCount=static_cast<int*>(mmap(NULL,sizeof *WriterCount, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,-1,0));
@@ -334,8 +359,11 @@ int main(int argc, char* argv[])
     cout << setfill('=') << setw(50) << "\n";
     t1 = clock();
     p(TimeBlock);
-    *Ptime=(float)t1 / CLOCKS_PER_SEC;
-    printf("%.3f", (float)*Ptime);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    *Ptime = end.tv_sec - begin.tv_sec;
+    *Ptime += (end.tv_nsec - begin.tv_nsec) / 10000000000.0;
+    //*Ptime=((float)(t1)) / CLOCKS_PER_SEC;
+    printf("%.3lf", (float)*Ptime);
     cout << " Main process ID " << getpid() << " start\n"; 
     v(TimeBlock);   
     menu=(Menu*)shmat(menu_id,0,0);
@@ -345,7 +373,7 @@ int main(int argc, char* argv[])
     pid_t pid;
     int timepid;
     p(TimeBlock);
-    printf("%.3f", (float)*Ptime);
+    printf("%.3lf", (float)*Ptime);
     cout << " Main process start creating sub-process\n";
     v(TimeBlock);
     int k = 0;
@@ -363,9 +391,12 @@ int main(int argc, char* argv[])
 	   timepid=getpid();
 	   while(true)
             {
-            t1 = clock();
+            //t1 = clock();
 	     p(TimeBlock);
-            *Ptime=(float)t1 / CLOCKS_PER_SEC;
+            //*Ptime=((float)(t1)) / CLOCKS_PER_SEC;
+            clock_gettime(CLOCK_MONOTONIC, &end);
+            *Ptime = end.tv_sec - begin.tv_sec;
+            *Ptime += (end.tv_nsec - begin.tv_nsec) / 10000000000.0;
              v(TimeBlock);
 	    }
 	}
@@ -376,7 +407,7 @@ int main(int argc, char* argv[])
 		
 		p(CN);
 		 p(TimeBlock);
-            		printf("%.3f", (float)*Ptime);
+            		printf("%.3lf", (float)*Ptime);
 		 v(TimeBlock);
 			cout << " Customer ID " << i << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 			(*CustomerNumber)--;
@@ -394,7 +425,7 @@ int main(int argc, char* argv[])
         	} 
 	p(WN);
 	 p(TimeBlock);
-        printf("%.3f", (float)*Ptime);
+        printf("%.3lf", (float)*Ptime);
 	  v(TimeBlock);
         cout << " Customer ID " << i << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
 	v(WN);
@@ -407,14 +438,14 @@ int main(int argc, char* argv[])
 			(*WaitersCount)++;
 			int Wid=(*WaitersCount);
 			p(TimeBlock);
-            			printf("%.3f", (float)*Ptime);
+            			printf("%.3lf", (double)*Ptime);
 		 	v(TimeBlock);	
 			cout << " Waiter ID " << *WaitersCount << ": created PID " << getpid() << " PPID " << getppid() << "\n";
 		v(CN);
 		while(true)
         	{
 			p(TimeBlock);
-			if(*Ptime>atoi(argv[1]))
+			if(*Ptime>atoi(argv[1]) && checkDone() == 1)
 			{
 			  v(TimeBlock);
 				break;
@@ -425,7 +456,7 @@ int main(int argc, char* argv[])
         	} 
 	p(WN);
 	   p(TimeBlock);
-        printf("%.3f", (float)*Ptime);
+        printf("%.3lf", (double)*Ptime);
 	   v(TimeBlock);
         cout << " Waiter ID " << Wid << ": PID " << getpid() << " end work PPID " << getppid() << "\n";
 	v(WN);
@@ -442,25 +473,25 @@ int main(int argc, char* argv[])
 
 	   for(int i=0;i<totalnum;i++) // loop will run n times (n=5)
     	   	wait(NULL);
-	   kill(timepid,SIGKILL);
+	   //kill(timepid,SIGKILL);
    printMenu(numOfItems);
    for(int j = 0; j < numOfItems; j++){
        totalOrders += menu[j].TotalOrdered;
        amount += menu[j].TotalOrdered * menu[j].Price;
    }
    cout << "Total orders " << totalOrders << ", for an amount " << amount << " NIL\n";
-   printf("%.3f", (float)*Ptime);
+   printf("%.3lf", (float)*Ptime);
    cout << " Main ID " << getpid() << " end work\n";
-   printf("%.3f", (float)*Ptime);
+   printf("%.3lf", (float)*Ptime);
    cout << " End of simulation\n";
 
    shmctl(mem_id, IPC_RMID, 0);
    shmctl(menu_id, IPC_RMID, 0);
-   munmap(WriterCount, 5000);
-   munmap(ReadCount, 5000);
-   munmap(CustomerNumber, 5000);
-   munmap(WaitersNumber, 5000);
-   munmap(WaitersCount, 5000);
+   munmap(WriterCount, 100);
+   munmap(ReadCount, 100);
+   munmap(CustomerNumber, 100);
+   munmap(WaitersNumber, 100);
+   munmap(WaitersCount, 100);
    semctl(semkey1, 0, IPC_RMID);
    semctl(semkey2, 0, IPC_RMID);
    semctl(semkey3, 0, IPC_RMID);
